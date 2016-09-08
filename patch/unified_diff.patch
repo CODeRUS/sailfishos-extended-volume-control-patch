@@ -1,0 +1,305 @@
+diff --git a/VolumeControl.qml b/VolumeControl.qml
+index 7acfd45..3896da1 100644
+--- a/usr/share/lipstick-jolla-home-qt5/volumecontrol/VolumeControl.qml
++++ b/usr/share/lipstick-jolla-home-qt5/volumecontrol/VolumeControl.qml
+@@ -126,9 +126,11 @@ SystemWindow {
+         id: volumeArea
+ 
+         width: parent.width
+-        height: Theme.iconSizeSmall + Theme.paddingMedium
++        height: itemHeight * 4
+         y: -height
+ 
++        property int itemHeight: Theme.iconSizeSmall + Theme.paddingMedium
++
+         Rectangle {
+             anchors.fill: parent
+             color: "black"
+@@ -136,16 +138,136 @@ SystemWindow {
+         }
+ 
+         Rectangle {
++            property real displayVolume: {
++                if (profileControl.profile == "silent") {
++                    return 0
++                } else {
++                    return profileControl.ringerVolume / 100
++                }
++            }
++
++            property real widthFraction: displayVolume
++
++            anchors {
++                bottom: parent.verticalCenter
++                bottomMargin: Theme.paddingSmall/2
++                left: parent.left
++            }
++
++            width: volumeArea.width * widthFraction
++            height: Theme.iconSizeSmall + Theme.paddingSmall
++
++            Behavior on widthFraction {
++                enabled: !showContinuousVolume && !disableSmoothChange
++                NumberAnimation { easing.type: Easing.OutSine }
++            }
++
++            color: Theme.highlightColor
++        }
++
++        MouseArea {
++            anchors {
++                bottom: parent.verticalCenter
++                bottomMargin: Theme.paddingSmall/2
++                top: parent.top
++                topMargin: Theme.paddingSmall/2
++                left: parent.left
++                right: parent.right
++            }
++            function setRingerVolume(mouse) {
++                var newVolume = Math.round(mouse.x / width * 100)
++                if (newVolume < 5) {
++                    newVolume = 0
++                }
++                else if (newVolume > 95) {
++                    newVolume = 100
++                }
++                profileControl.ringerVolume = newVolume
++                hideTimer.restart()
++            }
++            onPressed: setRingerVolume(mouse)
++            onPositionChanged: setRingerVolume(mouse)
++        }
++
++        Item {
++            anchors {
++                top: parent.top
++                topMargin: Theme.paddingSmall/2
++                left: parent.left
++                right: parent.right
++            }
++            height: Theme.iconSizeSmall + Theme.paddingSmall
++
++            property bool mute: profileControl.profile === "silent" || profileControl.ringerVolume === 0
++            property real muteOpacity: mute ? 1 : 0
++            Behavior on muteOpacity {
++                enabled: volumeBar.state != "" && volumeBar.state != "showBarExternal"
++                FadeAnimation { property: "muteOpacity" }
++            }
++
++            Image {
++                id: muteRingerIcon
++
++                anchors.verticalCenter: parent.verticalCenter
++                x: Theme.horizontalPageMargin
++                opacity: parent.muteOpacity
++
++                property string baseSource: "image://theme/icon-system-ringtone-mute"
++                source: baseSource + "?" + (controllingMedia ? Theme.primaryColor : Theme.highlightColor)
++            }
++
++            Image {
++                id: volumeRingerIcon
++
++                anchors.verticalCenter: parent.verticalCenter
++                x: Theme.horizontalPageMargin
++                opacity: 1 - parent.muteOpacity
++
++                property string baseSource: "image://theme/icon-system-ringtone"
++                source: baseSource + "?" + (controllingMedia ? Theme.primaryColor : Theme.highlightColor)
++            }
++
++            Label {
++                anchors {
++                    verticalCenter: parent.verticalCenter
++                    left: muteRingerIcon.right
++                    leftMargin: Theme.paddingMedium
++                }
++
++                font.pixelSize: Theme.fontSizeExtraSmall
++                opacity: parent.muteOpacity
++                color: controllingMedia ? Theme.primaryColor : Theme.highlightColor
++
++                //% "Muted"
++                text: qsTrId("lipstick-jolla-home-la-muted")
++            }
++
++            Label {
++                anchors {
++                    verticalCenter: parent.verticalCenter
++                    left: volumeRingerIcon.right
++                    leftMargin: Theme.paddingMedium
++                }
++
++                font.pixelSize: Theme.fontSizeExtraSmall
++                opacity: 1 - parent.muteOpacity
++                color: controllingMedia ? Theme.primaryColor : Theme.highlightColor
++
++                text: {
++                    //% "Ringtone volume"
++                    return qsTrId("lipstick-jolla-home-la-ringtone_volume")
++                }
++            }
++        }
++
++        Rectangle {
+             id: volumeRect
+ 
+             objectName: "volumeRect"
+ 
+             // On large screens display continuous volume changes
+             property real displayVolume: {
+-                if (!controllingMedia && profileControl.profile == "silent") {
+-                    return 0
+-                }
+-                if (controllingMedia && volumeControl.callActive) {
++                if (volumeControl.callActive) {
+                     if (showContinuousVolume)
+                         return (continuousVolume+1) / (maximumVolume+1)
+                     else
+@@ -153,41 +275,60 @@ SystemWindow {
+                 } else {
+                     if (showContinuousVolume)
+                         return continuousVolume / maximumVolume
+-                    else if (controllingMedia)
+-                        return volumeControl.volume / volumeControl.maximumVolume
+                     else
+-                        return profileControl.ringerVolume / 100
++                        return volumeControl.volume / volumeControl.maximumVolume
+                 }
+             }
+ 
+             property real widthFraction: displayVolume
+ 
+             anchors {
+-                top: parent.top
+-                topMargin: Theme.paddingSmall/2
+                 bottom: parent.bottom
+                 bottomMargin: Theme.paddingSmall/2
+                 left: parent.left
+             }
+ 
+-            width: volumeArea.width * widthFraction
++            width: volumeArea.width * displayVolume
++            height: Theme.iconSizeSmall + Theme.paddingSmall
+ 
+             Behavior on widthFraction {
+                 enabled: !showContinuousVolume && !disableSmoothChange
+                 NumberAnimation { easing.type: Easing.OutSine }
+             }
+ 
+-            color: _backgroundColor
++            color: Theme.secondaryHighlightColor
++        }
++
++        MouseArea {
++            anchors {
++                bottom: parent.bottom
++                bottomMargin: Theme.paddingSmall/2
++                top: parent.verticalCenter
++                topMargin: Theme.paddingSmall/2
++                left: parent.left
++                right: parent.right
++            }
++            function setMediaVolume(mouse) {
++                var newVolume = Math.round(mouse.x / width * volumeControl.maximumVolume)
++                volumeControl.volume = newVolume
++                hideTimer.restart()
++            }
++            onPressed: setMediaVolume(mouse)
++            onPositionChanged: setMediaVolume(mouse)
+         }
+ 
+         Item {
+             objectName: "volumeAnnotation"
+ 
+-            anchors.fill: parent
++            anchors {
++                top: parent.verticalCenter
++                topMargin: Theme.paddingSmall/2
++                left: parent.left
++                right: parent.right
++            }
++            height: Theme.iconSizeSmall + Theme.paddingSmall
+ 
+-            property bool mute: controllingMedia
+-                                ? (!volumeControl.callActive && volumeControl.volume === 0)
+-                                : (profileControl.profile === "silent" || profileControl.ringerVolume === 0)
++            property bool mute: !volumeControl.callActive && volumeControl.volume === 0
+             property real muteOpacity: mute ? 1 : 0
+             Behavior on muteOpacity {
+                 enabled: volumeBar.state != "" && volumeBar.state != "showBarExternal"
+@@ -201,8 +342,8 @@ SystemWindow {
+                 x: Theme.horizontalPageMargin
+                 opacity: parent.muteOpacity
+ 
+-                property string baseSource: controllingMedia ? "image://theme/icon-system-volume-mute" : "image://theme/icon-system-ringtone-mute"
+-                source: baseSource + "?" + _foregroundColor
++                property string baseSource: "image://theme/icon-system-volume-mute"
++                source: baseSource + "?" + (controllingMedia ? Theme.highlightColor : Theme.primaryColor)
+             }
+ 
+             Image {
+@@ -212,8 +353,8 @@ SystemWindow {
+                 x: Theme.horizontalPageMargin
+                 opacity: 1 - parent.muteOpacity
+ 
+-                property string baseSource: controllingMedia ? "image://theme/icon-system-volume" : "image://theme/icon-system-ringtone"
+-                source: baseSource + "?" + _foregroundColor
++                property string baseSource: "image://theme/icon-system-volume"
++                source: baseSource + "?" + (controllingMedia ? Theme.highlightColor : Theme.primaryColor)
+             }
+ 
+             Label {
+@@ -225,7 +366,7 @@ SystemWindow {
+ 
+                 font.pixelSize: Theme.fontSizeExtraSmall
+                 opacity: parent.muteOpacity
+-                color: _foregroundColor
++                color: controllingMedia ? Theme.highlightColor : Theme.primaryColor
+ 
+                 //% "Muted"
+                 text: qsTrId("lipstick-jolla-home-la-muted")
+@@ -240,24 +381,19 @@ SystemWindow {
+ 
+                 font.pixelSize: Theme.fontSizeExtraSmall
+                 opacity: 1 - parent.muteOpacity
+-                color: _foregroundColor
++                color: controllingMedia ? Theme.highlightColor : Theme.primaryColor
+ 
+                 text: {
+-                    if (controllingMedia) {
+-                        if (volumeControl.volume > volumeControl.safeVolume) {
+-                            //% "High volume"
+-                            return qsTrId("lipstick-jolla-home-la-high-volume")
+-                        } else if (volumeControl.callActive && volumeControl.volume === 0) {
+-                            //: Label used when minimum (unmuted) volume is set
+-                            //% "Minimum"
+-                            return qsTrId("lipstick-jolla-home-la-minimum-volume")
+-                        } else {
+-                            //% "Volume"
+-                            return qsTrId("lipstick-jolla-home-la-volume")
+-                        }
++                    if (volumeControl.volume > volumeControl.safeVolume) {
++                        //% "High volume"
++                        return qsTrId("lipstick-jolla-home-la-high-volume")
++                    } else if (volumeControl.callActive && volumeControl.volume === 0) {
++                        //: Label used when minimum (unmuted) volume is set
++                        //% "Minimum"
++                        return qsTrId("lipstick-jolla-home-la-minimum-volume")
+                     } else {
+-                        //% "Ringtone volume"
+-                        return qsTrId("lipstick-jolla-home-la-ringtone_volume")
++                        //% "Volume"
++                        return qsTrId("lipstick-jolla-home-la-volume")
+                     }
+                 }
+             }
+@@ -434,7 +570,7 @@ SystemWindow {
+ 
+     Timer {
+         id: hideTimer
+-        interval: 1500
++        interval: 3000
+         onTriggered: {
+             if (!Lipstick.compositor.volumeGestureFilterItem.active)
+                 volumeBar.state = ""

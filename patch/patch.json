@@ -1,0 +1,8 @@
+{
+    "name": "Extended volume control patch",
+    "description": "Extended volume control patch allow you to change ringer and media volume separately by moving your finger",
+    "category": "homescreen",
+    "infos": {
+        "maintainer": "coderus"
+    }
+}
